@@ -1,13 +1,9 @@
 const config = {
-   
     type: Phaser.AUTO,
     scale: {
         mode: Phaser.Scale.FIT, 
         autoCenter: Phaser.Scale.CENTER_BOTH,
-       
     },
-
-    type: Phaser.AUTO,
     width: 560,
     height: 900, 
     backgroundColor: "#050101",
@@ -15,6 +11,7 @@ const config = {
         default: "arcade",
         arcade: { 
             debug: false,
+            fps: 120, 
             checkCollision: { up: true, down: false, left: true, right: true }
         }
     },
@@ -26,8 +23,6 @@ const config = {
 };
 
 const game = new Phaser.Game(config);
-
-
 
 const SHOOT_X = 280; 
 const SHOOT_Y = 800; 
@@ -89,7 +84,6 @@ function create() {
 
     this.physics.add.collider(balls, bricks, (ball, brick) => {
         playBounceSound(this); 
-        
         brick.health--;
         if (brick.health <= 0) {
             if (brick.text) brick.text.destroy();
@@ -110,13 +104,27 @@ function create() {
     });
 
     this.physics.add.overlap(balls, powerupsOrange, (ball, gem) => {
-        if (!gem.ballsHit) gem.ballsHit = new Set();
-        if (!gem.ballsHit.has(ball)) {
-            gem.ballsHit.add(ball);
-            if(this.rayoSfx) this.rayoSfx.play({ volume: 0.4 }); 
-            gem.setTint(0xffffff);
-            this.time.delayedCall(100, () => gem.clearTint());
+        // CORRECCIÓN: Lista de bolas que ya golpearon este power-up para evitar multihit
+        if (!gem.hitBalls) gem.hitBalls = new Set();
+
+        if (!gem.hitBalls.has(ball)) {
+            gem.hitBalls.add(ball);
+            
+            // Activamos el efecto
+            if(this.rayoSfx) this.rayoSfx.play({ volume: 0.3 }); 
             activateRowStrike(gem.y);
+
+            // Efecto visual
+            if (!gem.isActivated) {
+                gem.isActivated = true;
+                gem.setAlpha(0.3);
+                gem.setTint(0x444444);
+            }
+
+            // Después de 200ms permitimos que esta bola vuelva a activar el rayo si rebota y vuelve
+            this.time.delayedCall(200, () => {
+                if (gem.active) gem.hitBalls.delete(ball);
+            });
         }
     });
     
@@ -293,9 +301,9 @@ function resetTurn() {
     ballsReturned = 0;
     if (turboEvent) turboEvent.remove();
 
-    powerupsOrange.getChildren().forEach(p => { 
-        if(p.ballsHit && p.ballsHit.size > 0) p.destroy(); 
-    });
+    // Limpieza de powerups activados
+    const currentOrange = powerupsOrange.getChildren().filter(p => p.isActivated);
+    currentOrange.forEach(p => p.destroy());
 
     [bricks, powerupsBlue, powerupsOrange].forEach(group => {
         group.getChildren().forEach(obj => {
@@ -365,7 +373,6 @@ function spawnBrickRow(scene) {
             let b = bricks.create(x, 160, "rect_outline");
             let finalHealth = baseHealth;
 
-           
             if (level >= 35 && Math.random() < 0.30) {
                 finalHealth = baseHealth * 3;
                 b.setTint(0xffffff); 
@@ -384,15 +391,18 @@ function spawnBrickRow(scene) {
         } else if (subRand < 0.90) {
             powerupsBlue.create(x, 160, "powerup_blue");
         } else {
-            powerupsOrange.create(x, 160, "powerup_orange");
+            let orangePowerup = powerupsOrange.create(x, 160, "powerup_orange");
+            orangePowerup.body.setSize(70, 70);
         }
     }
 }
 
 function playBounceSound(scene) {
-    let currentTime = scene.time.now;
+    let currentTime = scene.now || (scene.time ? scene.time.now : 0);
     if (currentTime - lastBounceTime > 40) {
-        scene.bounceSfx.play({ detune: Phaser.Math.Between(-200, 200) });
-        lastBounceTime = currentTime;
+        if (scene.bounceSfx) {
+            scene.bounceSfx.play({ detune: Phaser.Math.Between(-200, 200) });
+            lastBounceTime = currentTime;
+        }
     }
 }
