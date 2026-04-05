@@ -1,4 +1,12 @@
 const config = {
+   
+    type: Phaser.AUTO,
+    scale: {
+        mode: Phaser.Scale.FIT, 
+        autoCenter: Phaser.Scale.CENTER_BOTH,
+       
+    },
+
     type: Phaser.AUTO,
     width: 560,
     height: 900, 
@@ -18,6 +26,8 @@ const config = {
 };
 
 const game = new Phaser.Game(config);
+
+
 
 const SHOOT_X = 280; 
 const SHOOT_Y = 800; 
